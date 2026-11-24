@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pengaturan Ruang & Sesi Ujian - CBT SRT 68</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+  <aside id="app-sidebar" class="w-full md:w-64 bg-white border-r border-pink-100 flex flex-col shrink-0"></aside>
+
+  <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+    <div class="mb-6">
+      <h2 class="text-2xl font-extrabold text-slate-800">Pengaturan Ruang, Sesi & Token Ujian</h2>
+      <p class="text-xs text-slate-500 mt-1">Khusus Administrator: Kelola ruang ujian, jadwal sesi lintas semua kelas, dan token aktif.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+      <!-- Token Control -->
+      <div class="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-800 mb-3"><i class="fa-solid fa-key text-pink-600 mr-1.5"></i> Token Ujian Aktif</h3>
+        <div class="flex gap-3">
+          <input type="text" id="input-token-aktif" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 font-mono font-bold text-pink-700 uppercase" />
+          <button onclick="updateToken()" class="px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold">Perbarui Token</button>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Token ini disembunyikan di halaman login peserta dan hanya terlihat oleh Admin & Proktor.</p>
+      </div>
+
+      <!-- Add Room & Session -->
+      <div class="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-800 mb-3"><i class="fa-solid fa-door-open text-pink-600 mr-1.5"></i> Tambah Ruang & Sesi Ujian</h3>
+        <form id="form-ruang-sesi" class="grid grid-cols-2 gap-3">
+          <input type="text" id="rs-ruang" required placeholder="Nama Ruang (cth: Lab 1)" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <input type="text" id="rs-sesi" required placeholder="Nama Sesi (cth: Sesi 3)" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <input type="time" id="rs-mulai" required value="08:00" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <input type="number" id="rs-durasi" required value="90" placeholder="Durasi (menit)" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <button type="submit" class="col-span-2 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold">Simpan Ruang & Sesi</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-pink-100 shadow-xs overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-pink-50/70 border-b border-pink-100 text-[11px] font-bold uppercase text-pink-800">
+            <th class="p-4">Nama Ruang</th>
+            <th class="p-4">Sesi</th>
+            <th class="p-4">Waktu Mulai</th>
+            <th class="p-4">Durasi</th>
+            <th class="p-4 text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-rs" class="divide-y divide-slate-100 text-sm"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    requireAuth(['admin']);
+    renderSidebar('3-pengaturan-ujian-sesi.html');
+
+    function renderRS() {
+      const db = getDB();
+      document.getElementById('input-token-aktif').value = db.config.activeToken;
+      document.getElementById('tbody-rs').innerHTML = db.ruangSesi.map(r => `
+        <tr class="hover:bg-pink-50/30">
+          <td class="p-4 font-bold text-slate-800">${r.namaRuang}</td>
+          <td class="p-4"><span class="px-2.5 py-1 rounded-full bg-pink-100 text-pink-700 text-xs font-bold">${r.namaSesi}</span></td>
+          <td class="p-4 text-slate-600">${r.waktuMulai} WITA</td>
+          <td class="p-4 font-semibold">${r.durasiMenit} Menit</td>
+          <td class="p-4 text-right">
+            <button onclick="deleteRS('${r.id}')" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-semibold">Hapus</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateToken() {
+      const db = getDB();
+      const val = document.getElementById('input-token-aktif').value.trim().toUpperCase();
+      if (!val) return;
+      db.config.activeToken = val;
+      saveDB(db);
+      showToast('Token ujian aktif berhasil diperbarui menjadi ' + val, 'success');
+    }
+
+    function deleteRS(id) {
+      showConfirmModal('Hapus Ruang & Sesi', 'Hapus jadwal ruang dan sesi ini?', () => {
+        const db = getDB();
+        db.ruangSesi = db.ruangSesi.filter(r => r.id !== id);
+        saveDB(db);
+        renderRS();
+        showToast('Ruang & sesi dihapus.', 'success');
+      });
+    }
+
+    document.getElementById('form-ruang-sesi').addEventListener('submit', e => {
+      e.preventDefault();
+      const db = getDB();
+      db.ruangSesi.push({
+        id: 'RS-' + Date.now(),
+        namaRuang: document.getElementById('rs-ruang').value.trim(),
+        namaSesi: document.getElementById('rs-sesi').value.trim(),
+        waktuMulai: document.getElementById('rs-mulai').value,
+        durasiMenit: Number(document.getElementById('rs-durasi').value) || 90,
+        aktif: true
+      });
+      saveDB(db);
+      e.target.reset();
+      renderRS();
+      showToast('Ruang dan sesi baru berhasil disimpan.', 'success');
+    });
+
+    (async () => {
+      renderRS();
+      await pullCloudDB(true);
+    })();
+  </script>
+</body>
+</html>

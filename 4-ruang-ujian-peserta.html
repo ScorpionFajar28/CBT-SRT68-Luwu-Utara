@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ruang Ujian Peserta - CBT SRT 68 Luwu Utara</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body class="min-h-screen bg-pink-50/60 select-none">
+  <!-- Top Exam Header -->
+  <header class="bg-white border-b border-pink-100 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-pink-600 text-white flex items-center justify-center font-bold">
+        <i class="fa-solid fa-laptop-file"></i>
+      </div>
+      <div>
+        <h1 class="text-sm font-extrabold text-slate-800">CBT SRT 68 Luwu Utara • Ruang Ujian</h1>
+        <p id="peserta-info" class="text-xs text-slate-500"></p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div id="warning-badge" class="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">
+        Peringatan: <span id="warning-count">0</span> / 4
+      </div>
+      <div class="px-4 py-1.5 rounded-xl bg-pink-600 text-white text-xs font-mono font-bold">
+        <i class="fa-regular fa-clock mr-1"></i> <span id="timer-display">90:00</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Step 1: Verification & Start Screen -->
+  <div id="start-screen" class="max-w-xl mx-auto mt-12 p-8 bg-white rounded-3xl border border-pink-100 shadow-lg text-center">
+    <div class="w-16 h-16 rounded-2xl bg-pink-100 text-pink-600 flex items-center justify-center mx-auto mb-4 text-2xl">
+      <i class="fa-solid fa-shield-halved"></i>
+    </div>
+    <h2 class="text-xl font-extrabold text-slate-800">Konfirmasi Paket Ujian ASAS</h2>
+    <p class="text-xs text-slate-500 mt-1 mb-6">Pilih paket mata pelajaran aktif dan masukkan kembali token ujian untuk memulai mode layar penuh.</p>
+
+    <div class="space-y-4 text-left">
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Paket Mata Pelajaran</label>
+        <select id="select-paket-mapel" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Verifikasi Token Ujian</label>
+        <input type="password" id="verify-token" placeholder="*****" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm tracking-widest" />
+      </div>
+      <button onclick="mulaiUjian()" class="w-full py-3 rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-bold text-sm shadow-md">
+        <i class="fa-solid fa-play mr-1.5"></i> Mulai Ujian (Mode Layar Penuh)
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 2: Active Exam Interface -->
+  <div id="exam-screen" class="hidden max-w-6xl mx-auto p-6 grid md:grid-cols-4 gap-6">
+    <div class="md:col-span-3 bg-white p-6 md:p-8 rounded-3xl border border-pink-100 shadow-xs flex flex-col justify-between min-h-[420px]">
+      <div id="question-container"></div>
+
+      <div class="flex items-center justify-between pt-6 mt-6 border-t border-slate-100">
+        <button onclick="prevQuestion()" id="btn-prev" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold">
+          <i class="fa-solid fa-arrow-left mr-1"></i> Sebelumnya
+        </button>
+        <button onclick="nextQuestion()" id="btn-next" class="px-5 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold">
+          Selanjutnya <i class="fa-solid fa-arrow-right ml-1"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-3xl border border-pink-100 shadow-xs flex flex-col justify-between">
+      <div>
+        <h3 class="text-xs font-extrabold uppercase text-slate-600 mb-3">Navigasi Nomor Soal</h3>
+        <div id="question-nav-grid" class="grid grid-cols-5 gap-2"></div>
+      </div>
+
+      <button onclick="konfirmasiSelesai()" class="mt-6 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">
+        <i class="fa-solid fa-paper-plane mr-1.5"></i> Kumpulkan Jawaban
+      </button>
+    </div>
+  </div>
+
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    const siswa = requireAuth(['siswa']);
+    function initPaketPeserta() {
+      const dbInit = getDB();
+      const kelasObj = dbInit.kelas.find(k => k.idRombel === siswa.idRombel);
+      document.getElementById('peserta-info').textContent = `${siswa.nama} (${siswa.username}) • ${kelasObj ? kelasObj.namaKelas : siswa.idRombel}`;
+      const eligibleMapel = dbInit.mapel.filter(m => m.aktif && (!kelasObj || m.jenjang === kelasObj.jenjang));
+      document.getElementById('select-paket-mapel').innerHTML = (eligibleMapel.length ? eligibleMapel : dbInit.mapel).map(m =>
+        `<option value="${m.kode}">${m.nama} (${m.jenjang})</option>`
+      ).join('');
+    }
+    initPaketPeserta();
+    pullCloudDB(false).then(() => initPaketPeserta());
+
+    let activeSoal = [];
+    let currentIdx = 0;
+    let answers = {};
+    let warnings = 0;
+    let examActive = false;
+    let selectedMapel = '';
+
+    function mulaiUjian() {
+      const db = getDB();
+      const token = document.getElementById('verify-token').value.trim();
+      if (token !== db.config.activeToken) {
+        showToast('Token verifikasi salah!', 'error');
+        return;
+      }
+
+      selectedMapel = document.getElementById('select-paket-mapel').value;
+      activeSoal = db.soal.filter(s => s.kodeMapel === selectedMapel);
+      if (activeSoal.length === 0) {
+        showToast('Belum ada soal pada paket mata pelajaran ini.', 'warning');
+        return;
+      }
+
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+
+      // Update status peserta
+      const uIdx = db.users.findIndex(u => u.id === siswa.id);
+      if (uIdx !== -1) {
+        db.users[uIdx].statusUjian = 'Sedang Mengerjakan';
+        saveDB(db);
+      }
+
+      examActive = true;
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('exam-screen').classList.remove('hidden');
+      renderQuestion();
+      startTimer(90 * 60);
+    }
+
+    // Anti-Cheating 4-Warning Protection
+    document.addEventListener('visibilitychange', () => {
+      if (examActive && document.hidden) {
+        registerWarning('Terdeteksi berpindah tab atau meminimalkan layar ujian!');
+      }
+    });
+
+    function registerWarning(reason) {
+      warnings++;
+      document.getElementById('warning-count').textContent = warnings;
+      const db = getDB();
+      const uIdx = db.users.findIndex(u => u.id === siswa.id);
+      if (uIdx !== -1) {
+        db.users[uIdx].pelanggaran = warnings;
+        saveDB(db);
+      }
+
+      if (warnings >= 4) {
+        showToast('Batas 4x peringatan terlampaui! Ujian dikumpulkan otomatis.', 'error');
+        submitExam();
+      } else {
+        showToast(`PERINGATAN ${warnings}/4: ${reason}`, 'warning');
+      }
+    }
+
+    function renderQuestion() {
+      const q = activeSoal[currentIdx];
+      const container = document.getElementById('question-container');
+      const savedVal = answers[q.id] || '';
+
+      let inputHtml = '';
+      if (q.tipe === 'PG' && q.opsi) {
+        inputHtml = `<div class="space-y-2.5 mt-4">` + Object.entries(q.opsi).map(([key, text]) => `
+          <label class="flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${savedVal === key ? 'bg-pink-50 border-pink-500 text-pink-900 font-semibold' : 'border-slate-200 hover:bg-slate-50'}">
+            <input type="radio" name="ans_${q.id}" value="${key}" ${savedVal === key ? 'checked' : ''} onchange="saveAnswer('${q.id}', '${key}')" class="accent-pink-600 w-4 h-4" />
+            <span class="text-sm"><strong>${key}.</strong> ${text}</span>
+          </label>
+        `).join('') + `</div>`;
+      } else {
+        inputHtml = `
+          <textarea rows="5" oninput="saveAnswer('${q.id}', this.value)" placeholder="Ketik jawaban uraian Anda di sini..." class="mt-4 w-full p-4 rounded-2xl border border-slate-200 focus:border-pink-500 text-sm">${savedVal}</textarea>
+        `;
+      }
+
+      container.innerHTML = `
+        <div>
+          <span class="inline-block px-3 py-1 rounded-full bg-pink-100 text-pink-700 text-xs font-bold mb-3">Soal No. ${currentIdx + 1} dari ${activeSoal.length}</span>
+          <p class="text-base font-semibold text-slate-800 leading-relaxed">${q.pertanyaan}</p>
+          ${inputHtml}
+        </div>
+      `;
+
+      // Update Nav Grid
+      document.getElementById('question-nav-grid').innerHTML = activeSoal.map((item, i) => {
+        const answered = Boolean(answers[item.id]);
+        const active = i === currentIdx;
+        return `
+          <button onclick="goToQuestion(${i})" class="h-9 rounded-xl text-xs font-bold border ${active ? 'ring-2 ring-pink-500 ' : ''}${answered ? 'bg-pink-600 text-white border-pink-600' : 'bg-slate-50 text-slate-700 border-slate-200'}">
+            ${i + 1}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function saveAnswer(qId, val) {
+      answers[qId] = val;
+      renderQuestion();
+    }
+
+    function goToQuestion(idx) { currentIdx = idx; renderQuestion(); }
+    function prevQuestion() { if (currentIdx > 0) { currentIdx--; renderQuestion(); } }
+    function nextQuestion() { if (currentIdx < activeSoal.length - 1) { currentIdx++; renderQuestion(); } }
+
+    function konfirmasiSelesai() {
+      showConfirmModal('Kumpulkan Jawaban Ujian', 'Apakah Anda yakin telah memeriksa seluruh jawaban dan ingin mengakhiri ujian?', submitExam);
+    }
+
+    function submitExam() {
+      examActive = false;
+      const db = getDB();
+      let skorPG = 0;
+      let hasUraian = false;
+
+      activeSoal.forEach(q => {
+        if (q.tipe === 'PG') {
+          if (answers[q.id] === q.kunci) skorPG += q.bobot;
+        } else {
+          hasUraian = true;
+        }
+      });
+
+      db.hasilUjian.push({
+        id: 'HSL-' + Date.now(),
+        siswaId: siswa.id,
+        kodeMapel: selectedMapel,
+        jawaban: answers,
+        skorPG,
+        skorUraian: 0,
+        skorTotal: skorPG,
+        statusKoreksi: hasUraian ? 'Menunggu Koreksi Uraian' : 'Selesai',
+        waktuSelesai: new Date().toLocaleString('id-ID')
+      });
+
+      const uIdx = db.users.findIndex(u => u.id === siswa.id);
+      if (uIdx !== -1) {
+        db.users[uIdx].statusUjian = 'Selesai';
+        db.users[uIdx].skor = skorPG;
+      }
+      saveDB(db);
+
+      showToast('Ujian selesai! Jawaban Anda telah tersimpan.', 'success');
+      setTimeout(() => {
+        sessionStorage.removeItem('cbt_srt68_user');
+        window.location.href = 'index.html';
+      }, 1200);
+    }
+
+    function startTimer(seconds) {
+      let rem = seconds;
+      setInterval(() => {
+        if (!examActive) return;
+        rem--;
+        const m = String(Math.floor(rem / 60)).padStart(2, '0');
+        const s = String(rem % 60).padStart(2, '0');
+        document.getElementById('timer-display').textContent = `${m}:${s}`;
+        if (rem <= 0) submitExam();
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
