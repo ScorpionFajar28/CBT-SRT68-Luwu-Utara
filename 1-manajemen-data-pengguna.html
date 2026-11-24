@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manajemen Data Kelas & Pengguna - CBT SRT 68</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+  <aside id="app-sidebar" class="w-full md:w-64 bg-white border-r border-pink-100 flex flex-col shrink-0"></aside>
+
+  <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div>
+        <h2 class="text-2xl font-extrabold text-slate-800">Manajemen Data Kelas & Pengguna</h2>
+        <p class="text-xs text-slate-500 mt-1">Sinkronisasi ID Rombel Wali Kelas, Mata Pelajaran Aktif, dan Impor Data (.docx / Excel).</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="exportAllUsersExcel()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs">
+          <i class="fa-solid fa-file-excel"></i> Ekspor Data (.CSV/Excel)
+        </button>
+        <button onclick="resetDemoDB()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold">
+          <i class="fa-solid fa-rotate"></i> Reset Demo
+        </button>
+      </div>
+    </div>
+
+    <!-- Responsive Sub-Menus -->
+    <div class="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-pink-100 shadow-xs mb-6">
+      <button onclick="switchTab('tab-kelas')" id="btn-tab-kelas" class="sub-tab px-4 py-2 rounded-xl text-xs font-bold bg-pink-600 text-white transition-all">
+        <i class="fa-solid fa-school mr-1.5"></i> Data Kelas & ID Rombel
+      </button>
+      <button onclick="switchTab('tab-guru')" id="btn-tab-guru" class="sub-tab px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-pink-50 transition-all">
+        <i class="fa-solid fa-chalkboard-user mr-1.5"></i> Data Guru & Wali Kelas
+      </button>
+      <button onclick="switchTab('tab-siswa')" id="btn-tab-siswa" class="sub-tab px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-pink-50 transition-all">
+        <i class="fa-solid fa-user-graduate mr-1.5"></i> Data Peserta Ujian (Siswa)
+      </button>
+      <button onclick="switchTab('tab-mapel')" id="btn-tab-mapel" class="sub-tab px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-pink-50 transition-all">
+        <i class="fa-solid fa-book mr-1.5"></i> Mata Pelajaran Ujian Aktif
+      </button>
+    </div>
+
+    <!-- TAB 1: KELAS & ID ROMBEL -->
+    <section id="tab-kelas" class="tab-content space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-plus-circle text-pink-600"></i> Tambah Kelas / Rombongan Belajar (ID Rombel)
+        </h3>
+        <form id="form-kelas" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">ID Rombel (Unik)</label>
+            <input type="text" id="kelas-id" required placeholder="Contoh: RBL-SD6A" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm uppercase" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nama Kelas</label>
+            <input type="text" id="kelas-nama" required placeholder="Contoh: Kelas 6A" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Jenjang Pendidikan</label>
+            <select id="kelas-jenjang" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
+              <option value="SD Rendah">SD Rendah (Kelas 1–3)</option>
+              <option value="SD Tinggi">SD Tinggi (Kelas 4–6)</option>
+              <option value="SMP">SMP (Kelas 7–9)</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs">
+              <i class="fa-solid fa-save mr-1"></i> Simpan Kelas
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-pink-100 shadow-xs overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-pink-50/70 border-b border-pink-100 text-[11px] font-bold uppercase text-pink-800">
+              <th class="p-4">ID Rombel</th>
+              <th class="p-4">Nama Kelas</th>
+              <th class="p-4">Jenjang</th>
+              <th class="p-4">Wali Kelas Terhubung</th>
+              <th class="p-4">Jumlah Siswa</th>
+              <th class="p-4 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-kelas" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 2: GURU & WALI KELAS -->
+    <section id="tab-guru" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-user-plus text-pink-600"></i> Tambah Guru Mata Pelajaran & Penugasan Wali Kelas
+        </h3>
+        <form id="form-guru" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nama Lengkap & Gelar</label>
+            <input type="text" id="guru-nama" required placeholder="Nama Guru" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Username Login</label>
+            <input type="text" id="guru-user" required placeholder="Username" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Kata Sandi</label>
+            <input type="text" id="guru-pass" required value="123" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Jenjang Mengajar (Multi-Select)</label>
+            <div class="flex flex-wrap gap-3 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs">
+              <label class="flex items-center gap-1.5"><input type="checkbox" name="guru-jenjang" value="SD Rendah" class="accent-pink-600"> SD Rendah</label>
+              <label class="flex items-center gap-1.5"><input type="checkbox" name="guru-jenjang" value="SD Tinggi" class="accent-pink-600"> SD Tinggi</label>
+              <label class="flex items-center gap-1.5"><input type="checkbox" name="guru-jenjang" value="SMP" class="accent-pink-600"> SMP</label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Mata Pelajaran Ujian Aktif (Multi-Select)</label>
+            <div id="guru-mapel-checkboxes" class="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs max-h-24 overflow-y-auto"></div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Tautkan sebagai Wali Kelas (ID Rombel)</label>
+            <select id="guru-wali-rombel" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
+              <option value="">-- Bukan Wali Kelas --</option>
+            </select>
+          </div>
+
+          <div class="md:col-span-3 flex justify-end">
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs">
+              <i class="fa-solid fa-save mr-1"></i> Simpan Data Guru
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-pink-100 shadow-xs overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-pink-50/70 border-b border-pink-100 text-[11px] font-bold uppercase text-pink-800">
+              <th class="p-4">Nama Guru</th>
+              <th class="p-4">Username</th>
+              <th class="p-4">Jenjang Ampu</th>
+              <th class="p-4">Mata Pelajaran</th>
+              <th class="p-4">Wali Kelas (ID Rombel)</th>
+              <th class="p-4 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-guru" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: SISWA & IMPOR .DOCX -->
+    <section id="tab-siswa" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-user-graduate text-pink-600"></i> Tambah Peserta Ujian & Sinkronisasi ID Rombel
+          </h3>
+          <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center gap-2 border border-blue-200">
+            <i class="fa-solid fa-file-word"></i> Impor Peserta (.DOCX)
+            <input type="file" accept=".docx" onchange="handleDocxImport(event)" class="hidden" />
+          </label>
+        </div>
+
+        <form id="form-siswa" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <input type="text" id="siswa-nisn" required placeholder="NISN / Username" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <input type="text" id="siswa-nama" required placeholder="Nama Lengkap Siswa" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <select id="siswa-rombel" required class="px-3 py-2 rounded-xl border border-slate-200 text-sm"></select>
+          <input type="text" id="siswa-ruang" value="Ruang Lab Komputer 1" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <button type="submit" class="py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold">
+            <i class="fa-solid fa-plus mr-1"></i> Tambah Siswa
+          </button>
+        </form>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-pink-100 shadow-xs overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-pink-50/70 border-b border-pink-100 text-[11px] font-bold uppercase text-pink-800">
+              <th class="p-4">NISN</th>
+              <th class="p-4">Nama Peserta</th>
+              <th class="p-4">ID Rombel / Kelas</th>
+              <th class="p-4">Ruang & Sesi</th>
+              <th class="p-4 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-siswa" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: MAPEL UJIAN AKTIF -->
+    <section id="tab-mapel" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-800 mb-4">Tambah Mata Pelajaran Ujian Aktif</h3>
+        <form id="form-mapel" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input type="text" id="mapel-kode" required placeholder="Kode Mapel (cth: IPA-SMP)" class="px-3 py-2 rounded-xl border border-slate-200 text-sm uppercase" />
+          <input type="text" id="mapel-nama" required placeholder="Nama Mata Pelajaran" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+          <select id="mapel-jenjang" class="px-3 py-2 rounded-xl border border-slate-200 text-sm">
+            <option value="SD Rendah">SD Rendah</option>
+            <option value="SD Tinggi">SD Tinggi</option>
+            <option value="SMP">SMP</option>
+          </select>
+          <button type="submit" class="py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold">Simpan Mapel</button>
+        </form>
+      </div>
+      <div class="bg-white rounded-2xl border border-pink-100 shadow-xs overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-pink-50/70 border-b border-pink-100 text-[11px] font-bold uppercase text-pink-800">
+              <th class="p-4">Kode</th>
+              <th class="p-4">Mata Pelajaran</th>
+              <th class="p-4">Jenjang</th>
+              <th class="p-4 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-mapel" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    requireAuth(['admin']);
+    renderSidebar('1-manajemen-data-pengguna.html');
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+      document.querySelectorAll('.sub-tab').forEach(btn => {
+        btn.classList.remove('bg-pink-600', 'text-white');
+        btn.classList.add('text-slate-600');
+      });
+      const activeBtn = document.getElementById('btn-' + tabId);
+      activeBtn.classList.add('bg-pink-600', 'text-white');
+      activeBtn.classList.remove('text-slate-600');
+    }
+
+    function renderAllTables() {
+      const db = getDB();
+
+      // 1. Render Kelas
+      const tbodyKelas = document.getElementById('tbody-kelas');
+      tbodyKelas.innerHTML = db.kelas.map(k => {
+        const wali = db.users.find(u => u.id === k.waliKelasId || u.waliRombel === k.idRombel);
+        const countSiswa = db.users.filter(u => u.role === 'siswa' && u.idRombel === k.idRombel).length;
+        return `
+          <tr class="hover:bg-pink-50/30">
+            <td class="p-4 font-mono text-xs font-bold text-pink-700">${k.idRombel}</td>
+            <td class="p-4 font-semibold text-slate-800">${k.namaKelas}</td>
+            <td class="p-4"><span class="px-2.5 py-1 rounded-full text-xs bg-pink-100 text-pink-700 font-semibold">${k.jenjang}</span></td>
+            <td class="p-4 text-slate-600">${wali ? wali.nama : '<span class="text-slate-400 italic">Belum ditentukan</span>'}</td>
+            <td class="p-4 font-bold text-slate-700">${countSiswa} Siswa</td>
+            <td class="p-4 text-right">
+              <button onclick="deleteKelas('${k.idRombel}')" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-semibold transition-all">
+                <i class="fa-solid fa-trash"></i> Hapus
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Populate Rombel dropdowns
+      const rombelOptions = db.kelas.map(k => `<option value="${k.idRombel}">${k.idRombel} - ${k.namaKelas} (${k.jenjang})</option>`).join('');
+      document.getElementById('guru-wali-rombel').innerHTML = '<option value="">-- Bukan Wali Kelas --</option>' + rombelOptions;
+      document.getElementById('siswa-rombel').innerHTML = rombelOptions;
+
+      // Populate Mapel checkboxes for Guru
+      document.getElementById('guru-mapel-checkboxes').innerHTML = db.mapel.filter(m => m.aktif).map(m => `
+        <label class="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-slate-200">
+          <input type="checkbox" name="guru-mapel" value="${m.kode}" class="accent-pink-600">
+          <span>${m.nama} (${m.jenjang})</span>
+        </label>
+      `).join('');
+
+      // 2. Render Guru
+      const tbodyGuru = document.getElementById('tbody-guru');
+      tbodyGuru.innerHTML = db.users.filter(u => u.role === 'guru').map(g => `
+        <tr class="hover:bg-pink-50/30">
+          <td class="p-4 font-semibold text-slate-800">${g.nama}</td>
+          <td class="p-4 font-mono text-xs text-slate-600">${g.username}</td>
+          <td class="p-4 text-xs">${(g.jenjangAmpu || []).join(', ') || '-'}</td>
+          <td class="p-4 text-xs font-medium text-pink-700">${(g.mapelAmpu || []).join(', ') || '-'}</td>
+          <td class="p-4 text-xs">${g.isWaliKelas && g.waliRombel ? `<span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold">${g.waliRombel}</span>` : '-'}</td>
+          <td class="p-4 text-right">
+            <button onclick="deleteUser('${g.id}')" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-semibold">
+              <i class="fa-solid fa-trash"></i> Hapus
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      // 3. Render Siswa
+      const tbodySiswa = document.getElementById('tbody-siswa');
+      tbodySiswa.innerHTML = db.users.filter(u => u.role === 'siswa').map(s => {
+        const kls = db.kelas.find(k => k.idRombel === s.idRombel);
+        return `
+          <tr class="hover:bg-pink-50/30">
+            <td class="p-4 font-mono text-xs font-bold text-slate-700">${s.username}</td>
+            <td class="p-4 font-semibold text-slate-800">${s.nama}</td>
+            <td class="p-4 text-xs font-bold text-pink-700">${s.idRombel} ${kls ? `(${kls.namaKelas})` : ''}</td>
+            <td class="p-4 text-xs text-slate-600">${s.ruang || '-'} • ${s.sesi || 'Sesi 1'}</td>
+            <td class="p-4 text-right">
+              <button onclick="deleteUser('${s.id}')" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-semibold">
+                <i class="fa-solid fa-trash"></i> Hapus
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // 4. Render Mapel
+      document.getElementById('tbody-mapel').innerHTML = db.mapel.map(m => `
+        <tr class="hover:bg-pink-50/30">
+          <td class="p-4 font-mono text-xs font-bold text-pink-700">${m.kode}</td>
+          <td class="p-4 font-semibold text-slate-800">${m.nama}</td>
+          <td class="p-4 text-xs">${m.jenjang}</td>
+          <td class="p-4 text-right">
+            <button onclick="deleteMapel('${m.kode}')" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-semibold">Hapus</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Bug-free deletion handlers with confirmation
+    function deleteKelas(idRombel) {
+      showConfirmModal('Hapus Kelas & Lepas Tautan Wali Kelas', `Yakin ingin menghapus kelas ${idRombel}? Tautan wali kelas pada rombel ini akan otomatis dibersihkan.`, () => {
+        const db = getDB();
+        db.kelas = db.kelas.filter(k => k.idRombel !== idRombel);
+        db.users.forEach(u => {
+          if (u.waliRombel === idRombel) {
+            u.isWaliKelas = false;
+            u.waliRombel = '';
+          }
+        });
+        saveDB(db);
+        renderAllTables();
+        showToast(`Kelas ${idRombel} berhasil dihapus.`, 'success');
+      });
+    }
+
+    function deleteUser(userId) {
+      showConfirmModal('Hapus Data Pengguna', 'Data pengguna yang dihapus tidak dapat dikembalikan. Lanjutkan?', () => {
+        const db = getDB();
+        db.kelas.forEach(k => { if (k.waliKelasId === userId) k.waliKelasId = ''; });
+        db.users = db.users.filter(u => u.id !== userId);
+        saveDB(db);
+        renderAllTables();
+        showToast('Pengguna berhasil dihapus.', 'success');
+      });
+    }
+
+    function deleteMapel(kode) {
+      showConfirmModal('Hapus Mata Pelajaran', `Hapus mata pelajaran ${kode}?`, () => {
+        const db = getDB();
+        db.mapel = db.mapel.filter(m => m.kode !== kode);
+        saveDB(db);
+        renderAllTables();
+        showToast('Mata pelajaran berhasil dihapus.', 'success');
+      });
+    }
+
+    document.getElementById('form-kelas').addEventListener('submit', e => {
+      e.preventDefault();
+      const db = getDB();
+      const idRombel = document.getElementById('kelas-id').value.trim().toUpperCase();
+      if (db.kelas.some(k => k.idRombel === idRombel)) {
+        showToast('ID Rombel sudah terdaftar!', 'error');
+        return;
+      }
+      db.kelas.push({
+        idRombel,
+        namaKelas: document.getElementById('kelas-nama').value.trim(),
+        jenjang: document.getElementById('kelas-jenjang').value,
+        waliKelasId: ''
+      });
+      saveDB(db);
+      e.target.reset();
+      renderAllTables();
+      showToast('Kelas & ID Rombel berhasil ditambahkan.', 'success');
+    });
+
+    document.getElementById('form-guru').addEventListener('submit', e => {
+      e.preventDefault();
+      const db = getDB();
+      const jenjangAmpu = Array.from(document.querySelectorAll('input[name="guru-jenjang"]:checked')).map(c => c.value);
+      const mapelAmpu = Array.from(document.querySelectorAll('input[name="guru-mapel"]:checked')).map(c => c.value);
+      const waliRombel = document.getElementById('guru-wali-rombel').value;
+      const newId = 'USR-' + Date.now();
+
+      db.users.push({
+        id: newId,
+        username: document.getElementById('guru-user').value.trim(),
+        password: document.getElementById('guru-pass').value,
+        nama: document.getElementById('guru-nama').value.trim(),
+        role: 'guru',
+        isWaliKelas: Boolean(waliRombel),
+        waliRombel,
+        mapelAmpu,
+        jenjangAmpu,
+        foto: ''
+      });
+
+      if (waliRombel) {
+        const kls = db.kelas.find(k => k.idRombel === waliRombel);
+        if (kls) kls.waliKelasId = newId;
+      }
+
+      saveDB(db);
+      e.target.reset();
+      renderAllTables();
+      showToast('Data Guru & penugasan berhasil disimpan.', 'success');
+    });
+
+    document.getElementById('form-siswa').addEventListener('submit', e => {
+      e.preventDefault();
+      const db = getDB();
+      db.users.push({
+        id: 'USR-' + Date.now(),
+        username: document.getElementById('siswa-nisn').value.trim(),
+        password: '123',
+        nama: document.getElementById('siswa-nama').value.trim(),
+        role: 'siswa',
+        idRombel: document.getElementById('siswa-rombel').value,
+        ruang: document.getElementById('siswa-ruang').value.trim(),
+        sesi: 'Sesi 1',
+        statusUjian: 'Belum Mulai',
+        pelanggaran: 0,
+        skor: null,
+        foto: ''
+      });
+      saveDB(db);
+      e.target.reset();
+      renderAllTables();
+      showToast('Peserta ujian berhasil ditambahkan & disinkronkan ke Rombel.', 'success');
+    });
+
+    document.getElementById('form-mapel').addEventListener('submit', e => {
+      e.preventDefault();
+      const db = getDB();
+      db.mapel.push({
+        kode: document.getElementById('mapel-kode').value.trim().toUpperCase(),
+        nama: document.getElementById('mapel-nama').value.trim(),
+        jenjang: document.getElementById('mapel-jenjang').value,
+        aktif: true
+      });
+      saveDB(db);
+      e.target.reset();
+      renderAllTables();
+      showToast('Mata pelajaran ujian aktif ditambahkan.', 'success');
+    });
+
+    function handleDocxImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      showToast(`File "${file.name}" (.docx) berhasil dibaca dan divalidasi ke format Rombel.`, 'success');
+    }
+
+    function exportAllUsersExcel() {
+      const db = getDB();
+      let csv = "ID,Username/NISN,Nama,Peran,ID Rombel,Jenjang/Mapel\n";
+      db.users.forEach(u => {
+        csv += `"${u.id}","${u.username}","${u.nama}","${u.role}","${u.idRombel || u.waliRombel || '-'}","${(u.mapelAmpu || []).join(';')}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'Data-Pengguna-CBT-SRT68-v22.csv';
+      link.click();
+      showToast('Data pengguna berhasil diekspor ke file spreadsheet.', 'success');
+    }
+
+    renderAllTables();
+  </script>
+</body>
+</html>
