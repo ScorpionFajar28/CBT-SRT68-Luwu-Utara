@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pengaturan Akun & Profil - CBT SRT 68</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+  <aside id="app-sidebar" class="w-full md:w-64 bg-white border-r border-pink-100 flex flex-col shrink-0"></aside>
+
+  <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+    <div class="mb-6">
+      <h2 class="text-2xl font-extrabold text-slate-800">Pengaturan Akun & Foto Profil</h2>
+      <p class="text-xs text-slate-500 mt-1">Perbarui foto profil dan kata sandi akun Anda secara mandiri.</p>
+    </div>
+
+    <div class="max-w-xl bg-white p-6 md:p-8 rounded-3xl border border-pink-100 shadow-xs space-y-6">
+      <div class="flex items-center gap-4">
+        <div id="preview-avatar"></div>
+        <div>
+          <label class="cursor-pointer px-4 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-bold inline-flex items-center gap-2">
+            <i class="fa-solid fa-camera"></i> Unggah Foto Profil Baru
+            <input type="file" accept="image/*" onchange="handlePhotoUpload(event)" class="hidden" />
+          </label>
+          <p class="text-[11px] text-slate-400 mt-1">Format JPG/PNG, disarankan rasio persegi 1:1.</p>
+        </div>
+      </div>
+
+      <form id="form-update-akun" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap</label>
+          <input type="text" id="set-nama" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Kata Sandi Baru</label>
+          <div class="relative">
+            <input type="password" id="set-password" required class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 text-sm" />
+            <button type="button" onclick="togglePasswordField('set-password', 'set-eye-icon')" class="absolute right-3.5 top-3 text-slate-400 hover:text-pink-600">
+              <i id="set-eye-icon" class="fa-solid fa-eye text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs">
+          <i class="fa-solid fa-save mr-1"></i> Simpan Perubahan Profil
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    const user = requireAuth(['admin', 'guru', 'proktor']);
+    renderSidebar('7-pengaturan-akun.html');
+
+    let tempFoto = user.foto || '';
+
+    function renderProfilePreview() {
+      document.getElementById('set-nama').value = user.nama;
+      document.getElementById('set-password').value = user.password;
+      const box = document.getElementById('preview-avatar');
+      box.innerHTML = tempFoto
+        ? `<img src="${tempFoto}" class="w-16 h-16 rounded-full object-cover border-2 border-pink-300" />`
+        : `<div class="w-16 h-16 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-extrabold text-2xl">${user.nama.charAt(0)}</div>`;
+    }
+
+    function handlePhotoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        tempFoto = ev.target.result;
+        renderProfilePreview();
+        showToast('Pratinjau foto diperbarui. Klik Simpan Perubahan Profil.', 'info');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('form-update-akun').addEventListener('submit', e => {
+      e.preventDefault();
+      const db = getDB();
+      const idx = db.users.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        db.users[idx].nama = document.getElementById('set-nama').value.trim();
+        db.users[idx].password = document.getElementById('set-password').value;
+        db.users[idx].foto = tempFoto;
+        saveDB(db);
+        setCurrentUser(db.users[idx]);
+        renderSidebar('7-pengaturan-akun.html');
+        showToast('Profil dan kata sandi berhasil diperbarui!', 'success');
+      }
+    });
+
+    renderProfilePreview();
+  </script>
+</body>
+</html>
